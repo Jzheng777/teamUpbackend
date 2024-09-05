@@ -1,7 +1,7 @@
-# urls.py
-
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from django.conf import settings
+from django.conf.urls.static import static
 from .views import (
     PostViewSet, 
     ConnectionViewSet, 
@@ -12,7 +12,9 @@ from .views import (
     PasswordResetRequestView, 
     PasswordResetView, 
     UserDetailView,
-    LoginView,  # Add this import
+    LoginView,
+    GroupMembersView, 
+    UserGroupsView
 )
 
 router = DefaultRouter()
@@ -29,4 +31,8 @@ urlpatterns = [
     path('auth/request-reset/', PasswordResetRequestView.as_view(), name='request-reset'),
     path('auth/reset-password/', PasswordResetView.as_view(), name='reset-password'),
     path('user/<str:username>/', UserDetailView.as_view(), name='user-detail'),
+    path('groups/<str:group_name>/members/', GroupMembersView.as_view(), name='group-members'),
+    path('users/<str:username>/groups/', UserGroupsView.as_view(), name='user-groups'),
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

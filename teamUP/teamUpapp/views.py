@@ -7,7 +7,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import UserSerializer
+from .models import Group, GroupMember
+from .serializers import UserSerializer, GroupSerializer
 from rest_framework.generics import RetrieveAPIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
@@ -17,6 +18,37 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+
+from rest_framework import viewsets
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Post, Group
+from .serializers import PostSerializer
+from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
+
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        username = request.data.get('user')
+        group_name = request.data.get('recipient_group')
+        user = get_object_or_404(User, username=username)
+        group = get_object_or_404(Group, name=group_name)
+        request.data['user'] = user.id
+        request.data['recipient_group'] = group.id
+        return super().create(request, *args, **kwargs)
+        
+    def get_queryset(self):
+        queryset = Post.objects.all()
+        group_name = self.request.query_params.get('recipient_group', None)
+        if group_name:
+            group = get_object_or_404(Group, name=group_name)
+            queryset = queryset.filter(recipient_group=group)
+        return queryset
+
 
 class ConnectionViewSet(viewsets.ModelViewSet):
     queryset = Connection.objects.all()
@@ -96,8 +128,21 @@ class LoginView(APIView):
         else:
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-
+class UserGroupsView(APIView):
+    def get(self, request, username):
+        user = get_object_or_404(User, username=username)
+        group_memberships = GroupMember.objects.filter(user=user)
+        groups = [membership.group for membership in group_memberships]
+        serializer = GroupSerializer(groups, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
+class GroupMembersView(APIView):
+    def get(self, request, group_name):
+        group = get_object_or_404(Group, name=group_name)
+        members = GroupMember.objects.filter(group=group)
+        users = [member.user for member in members]
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class PasswordResetRequestView(APIView):
     def post(self, request):

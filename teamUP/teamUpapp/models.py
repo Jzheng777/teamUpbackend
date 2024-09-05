@@ -1,5 +1,22 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_migrate
+from django.dispatch import receiver
+
+@receiver(post_migrate)
+def create_default_groups(sender, **kwargs):
+    if sender.name == 'teamUpapp':
+        group_data = [
+            {'name': 'FPS', 'is_protected': True},
+            {'name': 'Battle-Royale', 'is_protected': True},
+            {'name': 'MOBA', 'is_protected': True},
+            {'name': 'Sandbox', 'is_protected': True},
+            {'name': 'Action-Adventure', 'is_protected': True},
+        ]
+
+        for group_info in group_data:
+            Group.objects.update_or_create(name=group_info['name'], defaults={'is_protected': group_info['is_protected']})
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -9,19 +26,18 @@ class UserProfile(models.Model):
     show_ranking = models.BooleanField(default=True)
     profanity_filter = models.BooleanField(default=True)
     picture = models.URLField(blank=True, default='')
+    exp = models.IntegerField(default=0)
 
     def __str__(self):
         return self.user.username
-
-
 
 class Post(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
-    thumbnail_url = models.URLField(blank=True)
-    type = models.CharField(max_length
-    =20, default='post')
+    # thumbnail_url = models.URLField(blank=True)
+    # type = models.CharField(max_length
+    # =20, default='post')
     attributes = models.JSONField(default=dict)
     recipient_group = models.ForeignKey('Group', null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -30,8 +46,18 @@ class Connection(models.Model):
     from_user = models.ForeignKey(User, related_name='connections_from', on_delete=models.CASCADE)
     attributes = models.JSONField(default=dict)
 
+
 class Group(models.Model):
     name = models.CharField(max_length=100)
+    is_protected = models.BooleanField(default=False)
+
+    def delete(self, *args, **kwargs):
+        if self.is_protected:
+            raise Exception(f'The group "{self.name}" cannot be deleted because it is protected.')
+        super().delete(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 class GroupMember(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
