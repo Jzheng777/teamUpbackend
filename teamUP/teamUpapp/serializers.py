@@ -2,10 +2,29 @@ from rest_framework import serializers
 from .models import Post, Connection, GroupMember, PostReaction, FileUpload, UserProfile, Group
 from django.contrib.auth.models import User
 
+class PostReactionSerializer(serializers.ModelSerializer):
+    post_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PostReaction
+        fields = ['id', 'reactor', 'post', 'name', 'post_username']
+
+    def get_post_username(self, obj):
+        return obj.post.user.username  # Access the username of the user who made the post
+
+        
 class PostSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)
+    username = serializers.SerializerMethodField()
+    reactions = PostReactionSerializer(source='postreaction_set', many=True, read_only=True)
+
     class Meta:
         model = Post
-        fields = '__all__'
+        fields = ['id', 'content', 'user', 'username', 'reactions', 'recipient_group', 'parent', 'attributes']
+
+    def get_username(self, obj):
+        return obj.user.username
+
 
 class ConnectionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,11 +39,6 @@ class GroupSerializer(serializers.ModelSerializer):
 class GroupMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupMember
-        fields = '__all__'
-
-class PostReactionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PostReaction
         fields = '__all__'
 
 class FileUploadSerializer(serializers.ModelSerializer):

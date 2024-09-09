@@ -14,7 +14,9 @@ from .views import (
     UserDetailView,
     LoginView,
     GroupMembersView, 
-    UserGroupsView
+    UserGroupsView,
+    PostDetailView,
+    PostsByParentIDView
 )
 
 router = DefaultRouter()
@@ -33,6 +35,8 @@ urlpatterns = [
     path('user/<str:username>/', UserDetailView.as_view(), name='user-detail'),
     path('groups/<str:group_name>/members/', GroupMembersView.as_view(), name='group-members'),
     path('users/<str:username>/groups/', UserGroupsView.as_view(), name='user-groups'),
+    path('posts/<int:id>/', PostDetailView.as_view(), name='post-detail'),
+    path('posts/by-parent/<int:postID>/', PostsByParentIDView.as_view(), name='posts-by-parent'),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
