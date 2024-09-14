@@ -4,13 +4,17 @@ from django.contrib.auth.models import User
 
 class PostReactionSerializer(serializers.ModelSerializer):
     post_username = serializers.SerializerMethodField()
+    reactor_username = serializers.SerializerMethodField()
 
     class Meta:
         model = PostReaction
-        fields = ['id', 'reactor', 'post', 'name', 'post_username']
+        fields = ['id', 'reactor', 'post', 'name', 'post_username', 'reactor_username']
 
     def get_post_username(self, obj):
-        return obj.post.user.username  # Access the username of the user who made the post
+        return obj.post.user.username
+
+    def get_reactor_username(self, obj):
+        return obj.reactor.username
 
         
 class PostSerializer(serializers.ModelSerializer):
@@ -65,7 +69,20 @@ class FileUploadSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['search_history', 'make_private', 'allow_follow', 'show_ranking', 'picture', 'exp']
+        fields = ['search_history', 'make_private', 'allow_follow', 'show_ranking', 'picture', 'exp', 'find', 'description', 'discord', 'ranks', 'profanity_filter']
+        extra_kwargs = {
+            'search_history': {'required': False},
+            'make_private': {'required': False},
+            'allow_follow': {'required': False},
+            'show_ranking': {'required': False},
+            'picture': {'required': False},
+            'exp': {'required': False},
+            'find': {'required': False},
+            'description': {'required': False},
+            'discord': {'required': False},
+            'ranks': {'required': False},
+        }
+
 
 
 class UserSerializer(serializers.ModelSerializer):

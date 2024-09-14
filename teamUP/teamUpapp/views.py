@@ -8,25 +8,26 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Group, GroupMember
-from .serializers import UserSerializer, GroupSerializer
+from .models import Group, GroupMember, UserProfile, Post, Group
+from .serializers import UserSerializer, GroupSerializer, UserProfileSerializer, PostSerializer, GroupMemberSerializer
 from rest_framework.generics import RetrieveAPIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import action
 
-class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all()
-    serializer_class = PostSerializer
-    permission_classes = [IsAuthenticated]
+# class PostViewSet(viewsets.ModelViewSet):
+#     queryset = Post.objects.all()
+#     serializer_class = PostSerializer
+#     permission_classes = [IsAuthenticated]
 
-from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Post, Group
-from .serializers import PostSerializer
-from django.contrib.auth.models import User
-from django.shortcuts import get_object_or_404
+# from rest_framework import viewsets
+# from rest_framework.response import Response
+# from rest_framework import status
+# from .models import Post, Group
+# from .serializers import PostSerializer
+# from django.contrib.auth.models import User
+# from django.shortcuts import get_object_or_404
 
 class PostDetailView(RetrieveAPIView):
     queryset = Post.objects.all()
@@ -61,12 +62,34 @@ class PostViewSet(viewsets.ModelViewSet):
 
         return super().create(request, *args, **kwargs)
     
+    def partial_update(self, request, *args, **kwargs):
+        # Get the existing instance of the post
+        post_instance = self.get_object()
+        print(request.data)
+
+        # Update user if provided
+        username = request.data.get('user', None)
+        if username:
+            user = get_object_or_404(User, username=username)
+            request.data['user'] = user.id
+
+        # Update recipient_group if provided
+        group_name = request.data.get('recipient_group', None)
+        if group_name:
+            group = get_object_or_404(Group, name=group_name)
+            request.data['recipient_group'] = group.id
+        elif 'recipient_group' in request.data:
+            # Explicitly handle the case where recipient_group is set to null
+            request.data['recipient_group'] = None
+
+        # Call the parent class's partial_update to handle the update
+        return super().partial_update(request, *args, **kwargs)
+    
 class PostsByParentIDView(generics.ListAPIView):
     serializer_class = PostSerializer
 
     def get(self, request, *args, **kwargs):
         parent_id = self.kwargs.get('postID')
-        print(parent_id)
         if not parent_id:
             return Response({"error": "postID parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -81,11 +104,60 @@ class ConnectionViewSet(viewsets.ModelViewSet):
     serializer_class = ConnectionSerializer
     permission_classes = [IsAuthenticated]
 
+
 class GroupMemberViewSet(viewsets.ModelViewSet):
     queryset = GroupMember.objects.all()
     serializer_class = GroupMemberSerializer
     permission_classes = [IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        username = request.data.get('username')
+        group_name = request.data.get('group')
+
+        # Validate that both username and group are provided
+        if not username or not group_name:
+            return Response({'error': 'Username and group name are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the user and group
+        user = get_object_or_404(User, username=username)
+        group = get_object_or_404(Group, name=group_name)
+
+        # Create a new group member entry
+        GroupMember.objects.create(user=user, group=group)
+
+        return Response({'message': f'User {user.username} added to group {group.name}'}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['delete'])
+    def delete_by_username_and_group(self, request):
+        username = request.data.get('username')
+        group_name = request.data.get('group')
+
+        # Validate that both username and group are provided
+        if not username or not group_name:
+            return Response({'error': 'Username and group name are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the user and group
+        user = get_object_or_404(User, username=username)
+        group = get_object_or_404(Group, name=group_name)
+
+        # Find the GroupMember object
+        try:
+            group_member = GroupMember.objects.get(user=user, group=group)
+        except GroupMember.DoesNotExist:
+            return Response({'error': 'GroupMember not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Delete the group member
+        group_member.delete()
+
+        return Response({'message': f'User {user.username} removed from group {group.name}'}, status=status.HTTP_204_NO_CONTENT)
+
+class UserListView(APIView):
+    permission_classes = [IsAuthenticated]  # Require authentication to access the list
+
+    def get(self, request, *args, **kwargs):
+        users = User.objects.all()  # Get all users
+        serializer = UserSerializer(users, many=True)  # Serialize the user data
+        return Response(serializer.data)
 
 class PostReactionViewSet(viewsets.ModelViewSet):
     queryset = PostReaction.objects.all()
@@ -111,6 +183,30 @@ class PostReactionViewSet(viewsets.ModelViewSet):
 
         # Proceed to delete the reaction
         return super().destroy(request, *args, **kwargs)
+# class PostReactionViewSet(viewsets.ModelViewSet):
+#     queryset = PostReaction.objects.all()
+#     serializer_class = PostReactionSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def create(self, request, *args, **kwargs):
+#         # Get the user and post from the request data
+#         user = request.user
+#         post_id = request.data.get('post')
+#         post = get_object_or_404(Post, id=post_id)
+        
+#         # Ensure that a PostReaction can be created
+#         reaction = PostReaction.objects.create(reactor=user, post=post, name=request.data.get('name'))
+#         serializer = self.get_serializer(reaction)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+#     def destroy(self, request, *args, **kwargs):
+#         # Ensure the user is the owner of the reaction
+#         reaction = self.get_object()
+#         if reaction.reactor != request.user:
+#             return Response({'error': 'You are not authorized to delete this reaction.'}, status=status.HTTP_403_FORBIDDEN)
+
+#         # Proceed to delete the reaction
+#         return super().destroy(request, *args, **kwargs)
     
 class FileUploadViewSet(viewsets.ModelViewSet):
     queryset = FileUpload.objects.all()
@@ -127,8 +223,30 @@ class UserDetailView(RetrieveAPIView):
         username = self.kwargs.get('username')
         user = get_object_or_404(User, username=username)
         serializer = self.get_serializer(user)
-        # print(f'Serializer data: {serializer.data}')
         return Response(serializer.data)
+
+class UserProfileUpdateView(generics.UpdateAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+
+    def get_object(self):
+        username = self.kwargs.get('username')
+        user = get_object_or_404(User, username=username)
+        print(f"User: {user}")  # Debugging output
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        print(f"Profile: {profile}, Created: {created}")  # Debugging output
+        return profile
+
+    def patch(self, request, *args, **kwargs):
+        print(f"Request Data: {request.data}")  # Debugging output
+        partial = True
+        serializer = self.get_serializer(self.get_object(), data=request.data, partial=partial)
+        if not serializer.is_valid():
+            print(f"Serializer Errors: {serializer.errors}")  # Debugging output
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UserCreate(APIView):
@@ -158,10 +276,8 @@ class LoginView(APIView):
     def post(self, request, format=None):
         username = request.data.get('username')
         password = request.data.get('password')
-        # print(f"Attempting to authenticate with username: {username} and password: {password}")
 
         user = authenticate(request, username=username, password=password)
-        # print(f"Result of authentication: {user}")
 
         if user is not None:
             refresh = RefreshToken.for_user(user)
@@ -202,66 +318,4 @@ class PasswordResetView(APIView):
         return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
 
 
-# class PostViewSet(viewsets.ModelViewSet):
-#     queryset = Post.objects.all()
-#     serializer_class = PostSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     # def create(self, request, *args, **kwargs):
-#     #     username = request.data.get('user')
-#     #     group_name = request.data.get('recipient_group')
-#     #     user = get_object_or_404(User, username=username)
-#     #     group = get_object_or_404(Group, name=group_name)
-#     #     request.data['user'] = user.id
-#     #     request.data['recipient_group'] = group.id
-#     #     return super().create(request, *args, **kwargs)
-
-#     def create(self, request, *args, **kwargs):
-#         username = request.data.get('user')
-#         group_name = request.data.get('recipient_group', None)
-#         user = get_object_or_404(User, username=username)
-#         request.data['user'] = user.id
-#         if group_name:
-#             group = get_object_or_404(Group, name=group_name)
-#             request.data['recipient_group'] = group.id
-#         else:
-#             request.data['recipient_group'] = None
-
-#         return super().create(request, *args, **kwargs)
-        
-#     def get_queryset(self):
-#         queryset = Post.objects.all()
-#         group_name = self.request.query_params.get('recipient_group', None)
-#         if group_name:
-#             group = get_object_or_404(Group, name=group_name)
-#             queryset = queryset.filter(recipient_group=group)
-#         return queryset
-    
-# class PostReactionViewSet(viewsets.ModelViewSet):
-#     queryset = PostReaction.objects.all()
-#     serializer_class = PostReactionSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     def create(self, request, *args, **kwargs):
-#         # Get the user and post from the request data
-#         user = request.user
-#         post_id = request.data.get('post')
-#         reaction_name = request.data.get('name')
-
-#         # Ensure post exists
-#         post = get_object_or_404(Post, id=post_id)
-
-#         # Check if the user already reacted to this post with the same reaction
-#         existing_reaction = PostReaction.objects.filter(reactor=user, post=post, name=reaction_name).first()
-#         if existing_reaction:
-#             return Response({'error': 'You have already reacted to this post with this reaction.'}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # Create the reaction
-#         post_reaction = PostReaction.objects.create(
-#             reactor=user,
-#             post=post,
-#             name=reaction_name
-#         )
-#         serializer = self.get_serializer(post_reaction)
-#         return Response(serializer.data, status=status.HTTP_201_CREATED)
     

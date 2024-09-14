@@ -27,6 +27,10 @@ class UserProfile(models.Model):
     profanity_filter = models.BooleanField(default=True)
     picture = models.URLField(blank=True, default='')
     exp = models.IntegerField(default=0)
+    find = models.BooleanField(default=False)
+    description = models.TextField(blank=True, null=True)
+    discord = models.TextField(blank=True, null=True)
+    ranks = models.JSONField(default=dict)
 
     def __str__(self):
         return self.user.username
