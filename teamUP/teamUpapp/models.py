@@ -39,11 +39,9 @@ class Post(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
-    # thumbnail_url = models.URLField(blank=True)
-    # type = models.CharField(max_length
-    # =20, default='post')
     attributes = models.JSONField(default=dict)
     recipient_group = models.ForeignKey('Group', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class Connection(models.Model):
     to_user = models.ForeignKey(User, related_name='connections_to', on_delete=models.CASCADE)
@@ -75,4 +73,3 @@ class PostReaction(models.Model):
 class FileUpload(models.Model):
     file = models.FileField(upload_to='uploads/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-

@@ -19,6 +19,8 @@ from .views import (
     PostsByParentIDView,
     UserListView,
     UserProfileUpdateView,
+    UpdateConnectionAttributesView,
+
 )
 
 router = DefaultRouter()
@@ -41,6 +43,7 @@ urlpatterns = [
     path('posts/by-parent/<int:postID>/', PostsByParentIDView.as_view(), name='posts-by-parent'),
     path('users/', UserListView.as_view(), name='user-list'),
     path('user/<str:username>/profile/', UserProfileUpdateView.as_view(), name='user-profile-update'),
+    path('connections/<int:connection_id>/update-attributes/', UpdateConnectionAttributesView.as_view(), name='update-connection-attributes'),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
